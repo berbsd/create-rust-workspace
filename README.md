@@ -29,6 +29,13 @@ See `scripts/scaffold.sh --help`-style usage comments at the top of the script f
 flag list, including `--template-ref`/`--template-repo`/`--template-dir` for pinning to a
 specific template version or testing against a local checkout.
 
+## Releasing
+
+`bin/release VERSION` previews a release (changelog, version bump, tag) without changing
+anything; `bin/release VERSION --execute` cuts it for real — commits, tags, pushes, and
+opens a GitHub Release with the new `CHANGELOG.md` section as its notes. Changelog entries
+come from conventional commit messages via `git-cliff` (`.cliff.toml`).
+
 ## License
 
 Licensed under the Apache License, Version 2.0 (the "License"); see [LICENSE](LICENSE).
