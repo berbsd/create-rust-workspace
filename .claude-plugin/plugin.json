@@ -1,0 +1,14 @@
+{
+  "name": "create-rust-workspace",
+  "displayName": "Create Rust Workspace",
+  "description": "Scaffold a new Rust microservices Cargo workspace from the rust-workspace-template.",
+  "version": "0.1.0",
+  "author": {
+    "name": "David B",
+    "email": "berbsd@gmail.com"
+  },
+  "homepage": "https://github.com/berbsd/create-rust-workspace",
+  "repository": "https://github.com/berbsd/create-rust-workspace",
+  "license": "Apache-2.0",
+  "keywords": ["rust", "scaffold", "generator", "microservices", "template", "cargo"]
+}

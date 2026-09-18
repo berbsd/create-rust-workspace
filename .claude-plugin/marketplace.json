@@ -1,0 +1,14 @@
+{
+  "name": "create-rust-workspace",
+  "owner": {
+    "name": "David B",
+    "email": "berbsd@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "create-rust-workspace",
+      "source": "./",
+      "description": "Scaffold a new Rust microservices Cargo workspace from the rust-workspace-template."
+    }
+  ]
+}
