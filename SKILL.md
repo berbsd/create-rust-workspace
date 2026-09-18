@@ -97,8 +97,8 @@ than dependent on model judgment calls.
 
 3. **Report the result**: the target path, which template version was used (the script's
    final output line states this), whether the example was kept, and the printed next steps
-   (`./bin/bootstrap.sh` then `just check`). Don't run those yourself unless the user asks —
-   `bootstrap.sh` installs system-level tooling (Homebrew casks, rustup components) and is a
+   (`./bin/bootstrap` then `just check`). Don't run those yourself unless the user asks —
+   `bootstrap` installs system-level tooling (Homebrew casks, rustup components) and is a
    meaningfully impactful action to take unprompted.
 
 ## Notes

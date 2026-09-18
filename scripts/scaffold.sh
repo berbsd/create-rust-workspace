@@ -226,6 +226,6 @@ Done. $PROJECT_NAME scaffolded at $TARGET (template ref: ${TEMPLATE_REF:-local o
 
 Next steps:
   cd $TARGET
-  ./bin/bootstrap.sh   # installs rustup toolchain, just, lefthook, taplo, typos
+  ./bin/bootstrap       # installs rustup toolchain, just, lefthook, taplo, typos
   just check            # format check, clippy, tests, typos, cargo-deny
 EOF
