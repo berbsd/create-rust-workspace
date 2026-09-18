@@ -2,7 +2,7 @@
   "name": "create-rust-workspace",
   "displayName": "Create Rust Workspace",
   "description": "Scaffold a new Rust microservices Cargo workspace from the rust-workspace-template.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "David B",
     "email": "berbsd@gmail.com"
