@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-09-22
+
+### Bug Fixes
+
+- Stop the skill from dumping a 10-field checklist upfront
+
+### Documentation
+
+- Describe cargo-generate's license-fetch behavior in SKILL.md
+- Add AGENTS.md
+- Add plugin install/update instructions to README
+
+### Features
+
+- Generate workspaces via cargo-generate instead of hand-rolled sed
+- Reject an unsupported cargo-generate version before generating
+
 ## [0.1.1] - 2026-09-18
 
 ### Bug Fixes
