@@ -31,56 +31,52 @@ command yourself; it's a new global tool, not something to add silently.
 
 1. **Collect inputs — interactively, not as a checklist dump.** Never print the full
    list of fields below and ask the user to answer all of them in one reply; that's not
-   interactive, it's a form. Instead:
+   interactive, it's a form. Two asks, plus values resolved without asking:
 
-   - **Ask directly, in one short message** (plain text — these are free-form, not a
-     small option set): project name, author name and email, and repository URL (a
-     placeholder like `https://github.com/you/repo` is fine if none exists yet). If the
-     user's own request already gave one of these, don't re-ask it.
-   - **Ask with `AskUserQuestion`** (real options, not prose) for:
-     - **License** — options like `MIT`, `Apache-2.0`, `MIT OR Apache-2.0` (dual), and
-       `UNLICENSED`, since `AskUserQuestion` always offers a custom "Other" slot for any
-       other SPDX id or dual expression. The template fetches the real license text per
-       id from GitHub's Licenses API at generation time (needs `gh` installed and
-       authenticated — if it's missing or the id isn't one GitHub recognizes, generation
-       still succeeds but no `LICENSE` file is written for that id; mention this to the
-       user rather than silently treating it as done). "UNLICENSED" (npm's proprietary
-       marker, not a real SPDX id) always falls into that no-file case.
-     - **Keep the bundled example service?** — only ask if it's not obvious from the
-       user's request (e.g. "start from a blank workspace" already answers it). Default
-       to yes without asking otherwise; the example (`services/example` +
-       `hosts/example-host`) demonstrates the service/host pattern end-to-end with a
-       working CRUD resource and passing tests.
-   - **Resolve the rest yourself and state what you chose — don't ask up front:**
-     - **Slug**: derive from the project name (kebab-case). State it in your final
-       report; only ask if the derived slug looks wrong or ambiguous. `cargo-generate`
-       names the generated directory after the slug with no way to decouple the two (see
-       `scaffold.sh`'s header comment) — the workspace **will** be created at
-       `<parent>/<slug>`. If the user wants a differently-named directory, generate
-       normally and rename it afterward — don't pass a mismatched `--target`;
-       `scaffold.sh` rejects that outright.
+   - **Ask directly, in one short message** (plain text — free-form, not a small option
+     set): project name, author name and email, repository URL (a placeholder like
+     `https://github.com/you/repo` is fine if none exists yet), and Rust toolchain
+     version. For the Rust version: this is the `rust-toolchain.toml` channel (and, via
+     `scaffold.sh`, also the Dockerfile's `FROM rust:` tag and both CI toolchain steps —
+     all four stay in lockstep), not the Cargo edition (pinned to 2024 throughout; not
+     reconfigured by this skill). Resolve the current latest stable release *first* (in
+     order of preference: `rustc +stable --version`/`rustup check` if available, else a
+     quick web check against the Rust blog or
+     `static.rust-lang.org/dist/channel-rust-stable.toml`, else tell the user you
+     couldn't confirm it and ask them to supply one), then state that resolved version as
+     the default in the same message and ask if they want a different one — never skip
+     mentioning it, and never pass the bare word `stable` to `scaffold.sh` (a floating
+     channel defeats the reproducibility `rust-toolchain.toml` exists for). If the user's
+     own request already answered one of these fields, don't re-ask it.
+   - **Ask with one `AskUserQuestion` call, all three questions together** (real options,
+     not prose — and not split across separate calls or skipped as "obvious"):
+     1. **License** — options like `MIT`, `Apache-2.0`, `MIT OR Apache-2.0` (dual), and
+        `UNLICENSED`, since `AskUserQuestion` always offers a custom "Other" slot for any
+        other SPDX id or dual expression. The template fetches the real license text per
+        id from GitHub's Licenses API at generation time (needs `gh` installed and
+        authenticated — if it's missing or the id isn't one GitHub recognizes,
+        generation still succeeds but no `LICENSE` file is written for that id; mention
+        this to the user rather than silently treating it as done). "UNLICENSED" (npm's
+        proprietary marker, not a real SPDX id) always falls into that no-file case.
+     2. **Keep the bundled example service?** — yes (recommended) / no. The example
+        (`services/example` + `hosts/example-host`) demonstrates the service/host
+        pattern end-to-end with a working CRUD resource and passing tests. Always ask
+        this one — don't infer it from the user's phrasing and skip asking.
+     3. **Initialize git and make the first commit?** — yes (recommended) / no. Maps
+        directly to `cargo generate`'s own `--vcs git`/`--vcs none`; the initial commit
+        (when yes) is cargo-generate's own, not a custom message — there's no way to
+        control its text. Always ask this one too.
+   - **Resolve the rest yourself and state what you chose in the final report — don't
+     ask about these at all:**
+     - **Slug**: derive from the project name (kebab-case); only ask if it looks wrong
+       or ambiguous. `cargo-generate` names the generated directory after the slug with
+       no way to decouple the two (see `scaffold.sh`'s header comment) — the workspace
+       **will** be created at `<parent>/<slug>`. If the user wants a differently-named
+       directory, generate normally and rename it afterward — don't pass a mismatched
+       `--target`; `scaffold.sh` rejects that outright.
      - **Target parent directory**: default to the current directory unless the user's
        request implies otherwise. `<parent>/<slug>` must not already exist.
-     - **Rust toolchain version**: this is the `rust-toolchain.toml` channel (and, via
-       `scaffold.sh`, also the Dockerfile's `FROM rust:` tag and both CI toolchain steps
-       — all four stay in lockstep), not the Cargo edition (pinned to 2024 throughout;
-       not reconfigured by this skill). **Default to the current latest stable Rust
-       release**, resolved to a concrete version number — never pass the bare word
-       `stable` to `scaffold.sh` (a floating channel defeats the reproducibility
-       `rust-toolchain.toml` exists for). Resolve it, in order of preference:
-       1. `rustc +stable --version` or `rustup check`, if `rustup`/`cargo` are available.
-       2. A quick web check (e.g. the Rust blog's release announcements or
-          `static.rust-lang.org/dist/channel-rust-stable.toml`) if available.
-       3. Otherwise, tell the user you can't confirm the latest release and ask for one
-          explicitly rather than guessing — a stale guess baked into every generated
-          project's Dockerfile/CI is worse than asking.
-
-       State the resolved version in your final report (e.g. "used 1.XX.0, today's
-       latest stable") rather than silently assuming it with no mention at all.
      - **Metrics namespace**: defaults to the slug; only ask if it's likely to differ.
-     - **Initialize git and make the first commit?**: default yes. Maps directly to
-       `cargo generate`'s own `--vcs git`/`--vcs none`; the initial commit (when yes) is
-       cargo-generate's own, not a custom message — there's no way to control its text.
      - **Template version**: only ask if the user explicitly wants something other than
        the latest tagged release (e.g. pinning to an older version, or tracking `main`
        for unreleased template changes). Otherwise `scaffold.sh` resolves the latest tag
@@ -121,14 +117,16 @@ command yourself; it's a new global tool, not something to add silently.
    bug in the template, not something to patch around here — report the exact error to the
    user rather than hand-editing the generated output.
 
-3. **Report the result**: the target path, which template version was used (the script's
-   final output line states this), whether the example was kept, and the printed next steps
-   (`./bin/bootstrap` then `just check`). Also state whatever you resolved automatically in
-   step 1 instead of asking — slug, Rust version, git-init — so the user sees what was
-   chosen on their behalf even though they were never asked. Don't run `bootstrap`/`just
-   check` yourself unless the user asks — `bootstrap` installs system-level tooling
-   (Homebrew casks, rustup components) and is a meaningfully impactful action to take
-   unprompted.
+3. **Report the result**: the target path, which template version was used, and the
+   "Next steps" lines — copy these two from the script's own printed output verbatim
+   (`./bin/bootstrap`, then `./bin/doctor`, then `just check`, in that order); don't
+   retype or paraphrase filenames from memory, since that's how a wrong name (e.g.
+   "bootstrap.sh" — the actual file has no extension) or a dropped step creeps in. Also
+   state whatever you resolved silently in step 1 without asking — slug, metrics
+   namespace, template version — so the user sees what was chosen on their behalf. Don't
+   run `bootstrap`/`doctor`/`just check` yourself unless the user asks — `bootstrap`
+   installs system-level tooling (Homebrew casks, rustup components) and is a
+   meaningfully impactful action to take unprompted.
 
 ## Notes
 

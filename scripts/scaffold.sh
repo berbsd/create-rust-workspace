@@ -224,5 +224,6 @@ Done. $PROJECT_NAME scaffolded at $TARGET (template ref: $RESOLVED_REF)
 Next steps:
   cd $TARGET
   ./bin/bootstrap       # installs rustup toolchain, just, lefthook, taplo, typos
+  ./bin/doctor          # confirms everything installed cleanly and is up to date
   just check            # format check, clippy, tests, typos, cargo-deny
 EOF
