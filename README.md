@@ -5,6 +5,8 @@ A Claude Code plugin that scaffolds a new Rust microservices Cargo workspace fro
 
 ## Install
 
+Run these as slash commands inside a Claude Code session (not in a regular shell):
+
 ```
 /plugin marketplace add berbsd/create-rust-workspace
 /plugin install create-rust-workspace@create-rust-workspace
@@ -12,6 +14,19 @@ A Claude Code plugin that scaffolds a new Rust microservices Cargo workspace fro
 
 Also requires [`cargo-generate`](https://github.com/cargo-generate/cargo-generate):
 `cargo install cargo-generate --locked` (or `brew install cargo-generate`).
+
+## Update
+
+Claude Code checks marketplaces for updates periodically in the background, but to
+update right away:
+
+```
+/plugin marketplace update create-rust-workspace
+/plugin update create-rust-workspace@create-rust-workspace
+```
+
+`/plugin list` shows what's currently installed (including version); `/plugin uninstall
+create-rust-workspace@create-rust-workspace` removes it.
 
 ## Use
 
