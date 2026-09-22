@@ -35,10 +35,10 @@ create-rust-workspace@create-rust-workspace` removes it.
 ## Use
 
 Ask Claude Code to start a new Rust project — e.g. "start a new Rust microservices
-workspace" or "scaffold a new Rust backend". The skill will ask for a project name, slug,
-Rust version, author, license, repo URL, and whether to keep the bundled example
-service, then generate the workspace. The generated directory is always named after the
-slug — `cargo generate` ties the two together with no override.
+workspace" or "scaffold a new Rust backend". The skill will ask for a target folder,
+project name, slug, Rust version, author, license, repo URL, and whether to initialize
+git, then generate the workspace. The target folder is independent of the project
+name/slug — it can be any path, but it must not already exist non-empty.
 
 ## How it works
 
@@ -46,12 +46,16 @@ This repo contains only the generator (`SKILL.md` + `scripts/scaffold.sh`) — i
 vendor a copy of the template. At generation time, `scaffold.sh` resolves which version of
 `rust-workspace-template` to use (by default, its **latest release tag**, not the default
 branch — `cargo generate` has no "latest tag" concept of its own, so this script resolves
-it via `git ls-remote` first), then hands off to
-[`cargo generate`](https://github.com/cargo-generate/cargo-generate) for the actual clone,
-copy, and `{{TOKEN}}` substitution. `rust-workspace-template` carries its own
-`cargo-generate.toml` and `hooks/post.rhai`, which define the substitution rules, the
-keep-or-drop-the-example-service choice, and the Rust-toolchain version pin — this repo no
-longer implements any of that itself.
+it via `git ls-remote` first), refuses if the target folder already exists and isn't
+empty, then hands off to
+[`cargo generate --init`](https://github.com/cargo-generate/cargo-generate) (run from
+inside that folder — no subfolder is created, so the target's name has no required
+relationship to the project's slug) for the actual clone, copy, and `{{TOKEN}}`
+substitution. `rust-workspace-template` carries its own `cargo-generate.toml` and
+`hooks/post.rhai`, which define the substitution rules, the Rust-toolchain version pin,
+and the license-text fetch. `--init` ignores `cargo generate`'s own `--vcs` flag, so
+`scaffold.sh` runs `git init`/`add`/`commit`/`remote add origin` itself when git-init is
+requested.
 
 See `scripts/scaffold.sh --help`-style usage comments at the top of the script for the full
 flag list, including `--template-ref`/`--template-repo`/`--template-dir` for pinning to a

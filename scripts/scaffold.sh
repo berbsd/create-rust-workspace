@@ -5,11 +5,13 @@
 # =============================================================================
 # rust-workspace-template now carries its own cargo-generate.toml and
 # hooks/post.rhai, which do everything the old version of this script used to
-# do by hand: cloning, copying, token substitution, the example-service
-# on/off switch, and pinning the Rust toolchain version across the three
-# files that need it. This script's only remaining job is the one thing
-# cargo-generate has no equivalent for — resolving "latest tag" — plus
-# translating this plugin's flags into `cargo generate`'s.
+# do by hand: cloning, copying, token substitution, and pinning the Rust
+# toolchain version across the three files that need it. This script's
+# remaining jobs are the ones cargo-generate has no equivalent for —
+# resolving "latest tag", refusing a non-empty target directory, and (since
+# `--init` ignores `--vcs` entirely — verified empirically) running `git
+# init` itself — plus translating this plugin's flags into `cargo
+# generate`'s.
 #
 # Usage:
 #   scaffold.sh --target DIR --name NAME --slug SLUG \
@@ -17,21 +19,24 @@
 #     --license LICENSE --repo-url URL \
 #     --rust-version VERSION [--metric-namespace NS] \
 #     [--template-repo URL] [--template-ref REF] [--template-dir LOCAL_PATH] \
-#     [--no-example] [--git-init]
+#     [--git-init]
 #
 # All of --target/--name/--slug/--author-name/--author-email/--license/
 # --repo-url/--rust-version are required. --metric-namespace defaults to
-# --slug. --no-example populates the template's `keep_example` placeholder
-# with `false`. --git-init tells cargo-generate to run `git init` + an
-# initial commit (`--vcs git`); without it, no VCS is initialized
-# (`--vcs none`) — cargo-generate owns this now, so the initial commit
-# message is cargo-generate's own, not this script's.
+# --slug.
 #
-# --target's basename MUST equal --slug. cargo-generate names the directory
-# it creates after `--name` (kebab-cased --slug) and has no flag to decouple
-# the output directory's name from that value — see "Output Parameters" in
-# `cargo generate --help`. If you need a differently-named directory, rename
-# it after generation.
+# --target is the exact directory the workspace is generated into — it has
+# no required relationship to --slug (a project can live in a folder named
+# anything). If --target doesn't exist, it's created. If it exists and is
+# NOT EMPTY, this script refuses rather than merging into or overwriting
+# whatever's there — cargo-generate's own `--init` mode does neither check
+# (verified empirically: it silently coexists with pre-existing files), so
+# the check has to happen here.
+#
+# --git-init runs `git init` + an initial commit after a successful
+# generation. This is NOT cargo-generate's own `--vcs git` — `--init` mode
+# ignores `--vcs` unconditionally (verified: no `.git` appears even when
+# `--vcs git` is passed alongside `--init`), so this script does it by hand.
 #
 # Template source (in priority order), same semantics as before:
 #   --template-dir LOCAL_PATH   Passed to `cargo generate --path`. Skips the
@@ -44,10 +49,11 @@
 #                                worktree's `.git` (a pointer file back to the
 #                                main repo, not a real git dir) gets copied
 #                                straight into the generated output — observed
-#                                empirically, not something `--vcs none`
-#                                cleans up since there was never a clone to
-#                                skip. `--git`/`--template-repo` (the default,
-#                                real-clone path) doesn't have this problem.
+#                                empirically, not something this script's own
+#                                git-init cleans up since there was never a
+#                                clone to skip. `--git`/`--template-repo` (the
+#                                default, real-clone path) doesn't have this
+#                                problem.
 #   --template-repo URL         Passed to `cargo generate --git`. Defaults to
 #                                https://github.com/berbsd/rust-workspace-template.git.
 #   --template-ref REF          Passed to `cargo generate --tag` — despite
@@ -76,7 +82,6 @@ LICENSE=""
 REPO_URL=""
 RUST_VERSION=""
 METRIC_NAMESPACE=""
-KEEP_EXAMPLE=true
 GIT_INIT=0
 TEMPLATE_REPO="https://github.com/berbsd/rust-workspace-template.git"
 TEMPLATE_REF=""
@@ -124,7 +129,6 @@ while [[ $# -gt 0 ]]; do
     --template-repo) TEMPLATE_REPO="$2"; shift 2 ;;
     --template-ref) TEMPLATE_REF="$2"; shift 2 ;;
     --template-dir) TEMPLATE_DIR_OVERRIDE="$2"; shift 2 ;;
-    --no-example) KEEP_EXAMPLE=false; shift ;;
     --git-init) GIT_INIT=1; shift ;;
     *) die "unknown argument: $1" ;;
   esac
@@ -141,12 +145,11 @@ done
 [[ -z "$METRIC_NAMESPACE" ]] && METRIC_NAMESPACE="$PROJECT_SLUG"
 
 [[ ! "$PROJECT_SLUG" =~ ^[a-z][a-z0-9-]*$ ]] && die "--slug must be lowercase kebab-case (e.g. 'acme')"
-[[ -e "$TARGET" ]] && die "target already exists: $TARGET"
 
-TARGET_PARENT="$(dirname -- "$TARGET")"
-TARGET_BASENAME="$(basename -- "$TARGET")"
-[[ "$TARGET_BASENAME" != "$PROJECT_SLUG" ]] && die \
-  "--target's basename ('$TARGET_BASENAME') must equal --slug ('$PROJECT_SLUG') — cargo-generate names the generated directory after --slug and has no flag to decouple the two. Generate at .../$PROJECT_SLUG, then rename afterward if you need a different directory name."
+if [[ -e "$TARGET" ]]; then
+  [[ -d "$TARGET" ]] || die "target exists and is not a directory: $TARGET"
+  [[ -n "$(ls -A "$TARGET" 2>/dev/null)" ]] && die "target directory is not empty: $TARGET"
+fi
 
 command -v cargo-generate >/dev/null 2>&1 \
   || die "cargo-generate is not installed — run: cargo install cargo-generate --locked"
@@ -157,7 +160,7 @@ CARGO_GENERATE_VERSION=$(cargo generate --version 2>/dev/null | grep -oE '[0-9]+
 version_ge "$CARGO_GENERATE_VERSION" "$MIN_CARGO_GENERATE_VERSION" || die \
   "cargo-generate $CARGO_GENERATE_VERSION is installed, but rust-workspace-template needs >= $MIN_CARGO_GENERATE_VERSION (typed/regex-validated placeholders, [conditional] sections, Rhai hooks) — run: cargo install cargo-generate --locked --force"
 
-mkdir -p "$TARGET_PARENT"
+mkdir -p "$TARGET"
 
 # =============================================================================
 # Resolve the template source
@@ -188,15 +191,15 @@ else
 fi
 
 CARGO_GENERATE_ARGS+=(
+  --init
   --name "$PROJECT_SLUG"
-  --destination "$TARGET_PARENT"
   --silent
-  # rust-workspace-template's post-generation hook shells out to `sed` to pin
-  # the Rust toolchain version (and, with --no-example, trim Cargo.toml) —
-  # see that repo's hooks/post.rhai for why. This is the same template this
-  # plugin already trusted to run arbitrary sed/rsync before the
-  # cargo-generate migration; the trust boundary hasn't changed, only where
-  # the substitution logic lives.
+  # rust-workspace-template's post-generation hook shells out to `sed`/`gh`
+  # to pin the Rust toolchain version and fetch license text — see that
+  # repo's hooks/post.rhai for why. This is the same template this plugin
+  # already trusted to run arbitrary sed/rsync before the cargo-generate
+  # migration; the trust boundary hasn't changed, only where the
+  # substitution logic lives.
   --allow-commands
   -d "PROJECT_NAME=$PROJECT_NAME"
   -d "AUTHOR_NAME=$AUTHOR_NAME"
@@ -205,17 +208,22 @@ CARGO_GENERATE_ARGS+=(
   -d "REPO_URL=$REPO_URL"
   -d "METRIC_NAMESPACE=$METRIC_NAMESPACE"
   -d "RUST_VERSION=$RUST_VERSION"
-  -d "keep_example=$KEEP_EXAMPLE"
 )
 
-if [[ "$GIT_INIT" -eq 1 ]]; then
-  CARGO_GENERATE_ARGS+=(--vcs git)
-else
-  CARGO_GENERATE_ARGS+=(--vcs none)
-fi
-
 echo ">>> Running cargo generate"
-cargo generate "${CARGO_GENERATE_ARGS[@]}"
+(cd "$TARGET" && cargo generate "${CARGO_GENERATE_ARGS[@]}")
+
+PUSH_STEP=""
+if [[ "$GIT_INIT" -eq 1 ]]; then
+  echo ">>> git init"
+  (cd "$TARGET" && git init -q && git add -A && git commit -q -m "chore: scaffold from rust-workspace-template" \
+    && git remote add origin "$REPO_URL")
+  # git remote add only records the URL — it never pushes, and never checks
+  # the URL is real (a placeholder like https://github.com/you/repo is
+  # recorded exactly as happily as a real one), so pushing is always a
+  # separate, explicit step for the user to take once the remote is real.
+  PUSH_STEP="  git push -u origin \$(git branch --show-current)  # once $REPO_URL is a real, empty repo"
+fi
 
 cat <<EOF
 
@@ -226,4 +234,5 @@ Next steps:
   ./bin/bootstrap       # installs rustup toolchain, just, lefthook, taplo, typos
   ./bin/doctor          # confirms everything installed cleanly and is up to date
   just check            # format check, clippy, tests, typos, cargo-deny
+$PUSH_STEP
 EOF

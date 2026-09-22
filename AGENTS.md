@@ -9,21 +9,26 @@ vendor or duplicate that template's content.
 
 - **Here:** resolving which template version to use (`cargo-generate` has no "latest tag"
   concept — see `scaffold.sh`'s header), translating this plugin's flags into
-  `cargo generate`'s, and the install/version checks for `cargo-generate` itself.
+  `cargo generate`'s, the install/version checks for `cargo-generate` itself, refusing a
+  non-empty `--target`, and (since `cargo generate --init` ignores `--vcs` entirely) the
+  manual `git init`/`add`/`commit`/`remote add origin` when `--git-init` is passed.
 - **rust-workspace-template:** everything else — cloning, copying, `{{TOKEN}}`
-  substitution, the example-service on/off switch, the Rust-toolchain version pin. That
-  logic lives in that repo's `cargo-generate.toml` / `hooks/post.rhai`, not here. If a
-  generated workspace looks wrong, check there first before assuming a `scaffold.sh` bug.
+  substitution, the Rust-toolchain version pin, fetching license text. That logic lives
+  in that repo's `cargo-generate.toml` / `hooks/post.rhai`, not here. If a generated
+  workspace looks wrong, check there first before assuming a `scaffold.sh` bug.
 
 ## Making changes
 
 - `scripts/scaffold.sh` is the only real code in this repo. Keep it `bash`,
   `set -euo pipefail`, and run `shellcheck scripts/scaffold.sh` after any edit — it's the
   closest thing to a test suite here.
-- No automated tests. Verify behavior changes by actually running the script end-to-end,
-  both with and without `--no-example`. Use `--template-dir <local rust-workspace-template
-  checkout>` to skip the network — point it at a plain checkout, not a git worktree (leaks
-  a stray `.git` file into the output; see that flag's comment).
+- No automated tests. Verify behavior changes by actually running the script end-to-end —
+  a nonexistent target, an existing-but-empty target, and an existing-non-empty target
+  (must refuse), with and without `--git-init`. Use `--template-dir <local
+  rust-workspace-template checkout>` to skip the network — point it at a plain checkout,
+  not a git worktree (leaks a stray `.git` file into the output, and if it has other
+  worktrees nested inside it `cargo generate --path` walks into them too; see that flag's
+  comment).
 - Don't hand-edit generated output in a test run to "fix" something — the fix belongs in
   `scaffold.sh` or in `rust-workspace-template`, never patched around after the fact.
 

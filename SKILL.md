@@ -9,10 +9,10 @@ Generates a new Rust microservices workspace from
 [rust-workspace-template](https://github.com/berbsd/rust-workspace-template) (by default, its
 latest tagged release) using [`cargo generate`](https://github.com/cargo-generate/cargo-generate).
 The template bundles a `justfile`/`lefthook`/CI tooling stack, one shared library crate
-(`common-types` — the API error envelope and keyset pagination), a minimal self-contained
-example service + host built directly on `axum`/`sqlx`/`tokio` (no shared service framework —
-see the template's own README for why), and a set of engineering-discipline Claude Code skills
-(`rust-quality`, `rust-documenter`, and others).
+(`common-types` — the API error envelope and keyset pagination), empty `services/`,
+`hosts/`, `jobs/`, `workers/` directories scaffolded via the bundled `create-rust-service`
+skill (no shared service framework — see the template's own README for why), and a set of
+engineering-discipline Claude Code skills (`rust-quality`, `rust-documenter`, and others).
 
 Generation is deterministic — this skill's job is to collect the inputs, then hand off to
 `scripts/scaffold.sh`, a thin wrapper that resolves which template version to use and then
@@ -29,27 +29,37 @@ command yourself; it's a new global tool, not something to add silently.
 
 ## Steps
 
-1. **Collect inputs — interactively, not as a checklist dump.** Never print the full
-   list of fields below and ask the user to answer all of them in one reply; that's not
-   interactive, it's a form. Two asks, plus values resolved without asking:
+1. **Collect inputs — one question per message, waiting for a reply each time.**
+   Never bundle multiple fields into one paragraph (e.g. "what's the project name,
+   author, and repo URL?") and never print the full list of fields below as a
+   checklist — both read as a form, not a conversation, and both have caused this
+   skill to guess wrong when the user replied "go"/"yes" without addressing every
+   field packed into one message. Two kinds of ask, plus values resolved without
+   asking:
 
-   - **Ask directly, in one short message** (plain text — free-form, not a small option
-     set): project name, author name and email, repository URL (a placeholder like
-     `https://github.com/you/repo` is fine if none exists yet), and Rust toolchain
-     version. For the Rust version: this is the `rust-toolchain.toml` channel (and, via
+   - **Ask the free-form fields one at a time, each its own message, waiting for the
+     reply before asking the next:** target folder; project name; author name; author
+     email; repository URL (a placeholder like `https://github.com/you/repo` is fine if
+     none exists yet); Rust toolchain version. The **target folder** is independent of
+     the project name — don't derive one from the other, and don't assume the current
+     directory without asking (default the *offer* to the current directory if that
+     seems right, but still ask, since silently assuming it is exactly what caused this
+     skill to scaffold into the wrong place before). It can be a name that has nothing
+     to do with the project's display name or slug. If the user's own request already answered one of these,
+     skip asking it — but don't fold two *unanswered* fields into the same message. For
+     the Rust version specifically: this is the `rust-toolchain.toml` channel (and, via
      `scaffold.sh`, also the Dockerfile's `FROM rust:` tag and both CI toolchain steps —
      all four stay in lockstep), not the Cargo edition (pinned to 2024 throughout; not
      reconfigured by this skill). Resolve the current latest stable release *first* (in
      order of preference: `rustc +stable --version`/`rustup check` if available, else a
      quick web check against the Rust blog or
      `static.rust-lang.org/dist/channel-rust-stable.toml`, else tell the user you
-     couldn't confirm it and ask them to supply one), then state that resolved version as
-     the default in the same message and ask if they want a different one — never skip
+     couldn't confirm it and ask them to supply one), then ask for confirmation by
+     stating that resolved version as the default in its own message — never skip
      mentioning it, and never pass the bare word `stable` to `scaffold.sh` (a floating
-     channel defeats the reproducibility `rust-toolchain.toml` exists for). If the user's
-     own request already answered one of these fields, don't re-ask it.
-   - **Ask with one `AskUserQuestion` call, all three questions together** (real options,
-     not prose — and not split across separate calls or skipped as "obvious"):
+     channel defeats the reproducibility `rust-toolchain.toml` exists for).
+   - **Ask with one `AskUserQuestion` call, both questions together** (real options, not
+     prose — and not split into separate calls or skipped as "obvious"):
      1. **License** — options like `MIT`, `Apache-2.0`, `MIT OR Apache-2.0` (dual), and
         `UNLICENSED`, since `AskUserQuestion` always offers a custom "Other" slot for any
         other SPDX id or dual expression. The template fetches the real license text per
@@ -58,24 +68,16 @@ command yourself; it's a new global tool, not something to add silently.
         generation still succeeds but no `LICENSE` file is written for that id; mention
         this to the user rather than silently treating it as done). "UNLICENSED" (npm's
         proprietary marker, not a real SPDX id) always falls into that no-file case.
-     2. **Keep the bundled example service?** — yes (recommended) / no. The example
-        (`services/example` + `hosts/example-host`) demonstrates the service/host
-        pattern end-to-end with a working CRUD resource and passing tests. Always ask
-        this one — don't infer it from the user's phrasing and skip asking.
-     3. **Initialize git and make the first commit?** — yes (recommended) / no. Maps
-        directly to `cargo generate`'s own `--vcs git`/`--vcs none`; the initial commit
-        (when yes) is cargo-generate's own, not a custom message — there's no way to
-        control its text. Always ask this one too.
+     2. **Initialize git and make the first commit?** — yes (recommended) / no. When
+        yes, `scaffold.sh` runs `git init`/`add`/`commit` itself and adds `origin`
+        pointing at the repo URL from step 1 (recorded only — never pushed, never
+        checked for being real). Always ask this one — don't infer it and skip asking.
    - **Resolve the rest yourself and state what you chose in the final report — don't
      ask about these at all:**
      - **Slug**: derive from the project name (kebab-case); only ask if it looks wrong
-       or ambiguous. `cargo-generate` names the generated directory after the slug with
-       no way to decouple the two (see `scaffold.sh`'s header comment) — the workspace
-       **will** be created at `<parent>/<slug>`. If the user wants a differently-named
-       directory, generate normally and rename it afterward — don't pass a mismatched
-       `--target`; `scaffold.sh` rejects that outright.
-     - **Target parent directory**: default to the current directory unless the user's
-       request implies otherwise. `<parent>/<slug>` must not already exist.
+       or ambiguous. This is unrelated to the target folder's name (see above) — it only
+       feeds `cargo-generate`'s `--name` (the `project-name`/`crate_name` placeholders),
+       nothing about the directory.
      - **Metrics namespace**: defaults to the slug; only ask if it's likely to differ.
      - **Template version**: only ask if the user explicitly wants something other than
        the latest tagged release (e.g. pinning to an older version, or tracking `main`
@@ -87,7 +89,7 @@ command yourself; it's a new global tool, not something to add silently.
 
    ```sh
    "${CLAUDE_PLUGIN_ROOT}/scripts/scaffold.sh" \
-     --target "<parent dir>/<slug>" \
+     --target "<target folder>" \
      --name "<project name>" \
      --slug "<slug>" \
      --author-name "<author name>" \
@@ -97,31 +99,39 @@ command yourself; it's a new global tool, not something to add silently.
      --rust-version "<rust version>" \
      --metric-namespace "<metric namespace>" \
      [--template-ref "<template version, if the user asked for a non-default one>"] \
-     [--no-example] \
      [--git-init]
    ```
 
+   `--target` is the exact folder from step 1 — it can be any path/name, with no
+   required relationship to `--slug`.
+
    The script resolves which template ref to use (by default, `rust-workspace-template`'s
-   latest git tag — `cargo generate` has no "latest tag" concept of its own), then hands
-   everything else to `cargo generate --git ... --tag ... -d KEY=value ... --silent
-   --allow-commands`: the clone, the copy, the `{{TOKEN}}` substitution, the
-   keep-or-drop-the-example choice, and pinning the Rust toolchain version all live in
-   `rust-workspace-template`'s own `cargo-generate.toml`/`hooks/post.rhai` now, not in this
-   script. `--allow-commands` is required because that hook shells out to `sed` for the
-   toolchain-pin substitution — this is the same template this plugin already trusted to run
-   arbitrary shell commands before the cargo-generate migration, so the trust boundary hasn't
-   changed. The script exits non-zero with a clear message on bad input (existing target,
-   missing required field, malformed slug, mismatched target/slug basename, cargo-generate
-   not installed, no tags found on the template repo). If `cargo generate` itself fails
-   (e.g. "Substitution skipped, found invalid syntax in ..." or a Rhai hook error), that's a
-   bug in the template, not something to patch around here — report the exact error to the
-   user rather than hand-editing the generated output.
+   latest git tag — `cargo generate` has no "latest tag" concept of its own), refuses if
+   `--target` exists and is non-empty, then hands off to `cargo generate --init --git ...
+   --tag ... -d KEY=value ... --silent --allow-commands` run from inside `--target`: the
+   clone, the copy, the `{{TOKEN}}` substitution, pinning the Rust toolchain version, and
+   fetching the chosen license's real text all live in `rust-workspace-template`'s own
+   `cargo-generate.toml`/`hooks/post.rhai` now, not in this script. `--allow-commands` is
+   required because that hook shells out to `sed`/`gh` for the toolchain-pin substitution
+   and license fetch — this is the same template this plugin already trusted to run
+   arbitrary shell commands before the cargo-generate migration, so the trust boundary
+   hasn't changed. `--init` mode ignores `cargo generate`'s own `--vcs` flag entirely
+   (verified), so `--git-init` makes this script run `git init`/`add`/`commit`/`remote
+   add origin <repo-url>` itself afterward — `git remote add` only records the URL, it
+   never pushes and never checks the URL is real. The script exits non-zero with a clear
+   message on bad input (non-empty target, missing required field, malformed slug,
+   cargo-generate not installed or too old, no tags found on the template repo). If
+   `cargo generate` itself fails (e.g. "Substitution skipped, found invalid syntax in
+   ..." or a Rhai hook error), that's a bug in the template, not something to patch
+   around here — report the exact error to the user rather than hand-editing the
+   generated output.
 
 3. **Report the result**: the target path, which template version was used, and the
-   "Next steps" lines — copy these two from the script's own printed output verbatim
-   (`./bin/bootstrap`, then `./bin/doctor`, then `just check`, in that order); don't
-   retype or paraphrase filenames from memory, since that's how a wrong name (e.g.
-   "bootstrap.sh" — the actual file has no extension) or a dropped step creeps in. Also
+   "Next steps" lines — copy these from the script's own printed output verbatim
+   (`./bin/bootstrap`, then `./bin/doctor`, then `just check`, then a `git push` line if
+   `--git-init` was used); don't retype or paraphrase filenames from memory, since
+   that's how a wrong name (e.g. "bootstrap.sh" — the actual file has no extension) or a
+   dropped step creeps in. Also
    state whatever you resolved silently in step 1 without asking — slug, metrics
    namespace, template version — so the user sees what was chosen on their behalf. Don't
    run `bootstrap`/`doctor`/`just check` yourself unless the user asks — `bootstrap`
@@ -138,6 +148,8 @@ command yourself; it's a new global tool, not something to add silently.
   user-facing flow and shouldn't be offered unless the user is explicitly working on the
   generator or template itself. `--template-dir` should point at a plain checkout, not a
   git worktree — see the flag's own comment in `scaffold.sh` for why.
-- The generated directory's name is always the slug — `cargo generate` ties the two
-  together with no override flag. Don't try to satisfy a request for a differently-named
-  directory by passing a mismatched `--target`; generate normally, then `mv` it.
+- `--target` can be any folder — it has no required relationship to `--slug`. If it
+  already exists and has anything in it at all, `scaffold.sh` refuses rather than
+  merging into or overwriting what's there (`cargo generate --init`'s own behavior,
+  verified empirically: it silently coexists with pre-existing files, so the emptiness
+  check has to happen in this script).
