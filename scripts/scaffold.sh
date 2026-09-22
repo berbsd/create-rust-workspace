@@ -82,9 +82,32 @@ TEMPLATE_REPO="https://github.com/berbsd/rust-workspace-template.git"
 TEMPLATE_REF=""
 TEMPLATE_DIR_OVERRIDE=""
 
+# The oldest version this has actually been tested against — not researched
+# as the theoretical minimum that first shipped typed/regex-validated
+# placeholders, [conditional] sections, and Rhai hooks (rust-workspace-template
+# relies on all three). Bump this only after testing against a newer floor.
+MIN_CARGO_GENERATE_VERSION="0.25.0"
+
 die() {
   echo "error: $1" >&2
   exit 1
+}
+
+# True (exit 0) if version $1 >= $2, comparing dot-separated numeric fields
+# left to right. Not `sort -V`: portable across whatever `sort` a user's
+# machine happens to have, no assumption that a modern GNU/BSD-with-version-sort
+# build is what's on PATH.
+version_ge() {
+  local a="$1" b="$2"
+  local -a a_parts b_parts
+  IFS='.' read -r -a a_parts <<<"$a"
+  IFS='.' read -r -a b_parts <<<"$b"
+  for i in 0 1 2; do
+    local x="${a_parts[i]:-0}" y="${b_parts[i]:-0}"
+    ((10#$x > 10#$y)) && return 0
+    ((10#$x < 10#$y)) && return 1
+  done
+  return 0
 }
 
 while [[ $# -gt 0 ]]; do
@@ -127,6 +150,12 @@ TARGET_BASENAME="$(basename -- "$TARGET")"
 
 command -v cargo-generate >/dev/null 2>&1 \
   || die "cargo-generate is not installed — run: cargo install cargo-generate --locked"
+
+CARGO_GENERATE_VERSION=$(cargo generate --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+[[ -z "$CARGO_GENERATE_VERSION" ]] && die \
+  "couldn't parse a version out of 'cargo generate --version' — is cargo-generate installed correctly?"
+version_ge "$CARGO_GENERATE_VERSION" "$MIN_CARGO_GENERATE_VERSION" || die \
+  "cargo-generate $CARGO_GENERATE_VERSION is installed, but rust-workspace-template needs >= $MIN_CARGO_GENERATE_VERSION (typed/regex-validated placeholders, [conditional] sections, Rhai hooks) — run: cargo install cargo-generate --locked --force"
 
 mkdir -p "$TARGET_PARENT"
 
