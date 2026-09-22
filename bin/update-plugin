@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# =============================================================================
+# bin/update-plugin — make the locally installed plugin match the latest release
+# =============================================================================
+# Usage:
+#   bin/update-plugin
+#
+# Refreshes this plugin's marketplace, updates (or installs) the plugin, then
+# verifies the *active* installed version equals the latest release tag on
+# GitHub. Uses the `claude plugin` CLI rather than the in-session `/plugin
+# update` slash command: in practice the slash command downloaded new
+# versions into the cache without switching the active install, silently
+# leaving an old SKILL.md in use. This script fails loudly if that happens.
+#
+# Run it after `bin/release VERSION --execute`, then restart Claude Code —
+# skill text is loaded at session start.
+# =============================================================================
+
+set -euo pipefail
+
+MARKETPLACE="create-rust-workspace"
+PLUGIN="create-rust-workspace@create-rust-workspace"
+SOURCE="berbsd/create-rust-workspace"
+REPO_URL="https://github.com/$SOURCE.git"
+
+die() {
+  echo "error: $1" >&2
+  exit 1
+}
+
+command -v claude >/dev/null 2>&1 || die "the 'claude' CLI is not on PATH"
+command -v jq >/dev/null 2>&1 || die "jq is required (brew install jq)"
+
+installed_version() {
+  claude plugin list --json 2>/dev/null \
+    | jq -r --arg id "$PLUGIN" '.[] | select(.id == $id) | .version' \
+    | head -1
+}
+
+echo ">>> Resolving latest release tag on $REPO_URL"
+LATEST_TAG=$(git ls-remote --tags --sort='-v:refname' "$REPO_URL" 2>/dev/null \
+  | awk '{print $2}' \
+  | grep -v '\^{}$' \
+  | sed 's#^refs/tags/##' \
+  | head -1) || true
+[[ -z "$LATEST_TAG" ]] && die "no release tags found on $REPO_URL"
+LATEST="${LATEST_TAG#v}"
+echo ">>> Latest release: $LATEST"
+
+BEFORE="$(installed_version)"
+
+if ! claude plugin marketplace list 2>/dev/null | grep -q "$MARKETPLACE"; then
+  echo ">>> Adding marketplace $SOURCE"
+  claude plugin marketplace add "$SOURCE"
+fi
+
+echo ">>> Refreshing marketplace $MARKETPLACE"
+claude plugin marketplace update "$MARKETPLACE"
+
+if [[ -z "$BEFORE" ]]; then
+  echo ">>> Installing $PLUGIN"
+  claude plugin install "$PLUGIN"
+else
+  echo ">>> Updating $PLUGIN (currently $BEFORE)"
+  claude plugin update "$PLUGIN"
+fi
+
+AFTER="$(installed_version)"
+[[ -z "$AFTER" ]] && die "$PLUGIN is not installed after update — check 'claude plugin list'"
+
+if [[ "$AFTER" != "$LATEST" ]]; then
+  die "active install is $AFTER, but the latest release is $LATEST. The marketplace may not have picked up the release yet (was bin/release pushed?), or the update didn't switch versions — try 'claude plugin uninstall $PLUGIN' then re-run this script."
+fi
+
+echo ""
+echo "Done. $PLUGIN is at $AFTER (was ${BEFORE:-not installed})."
+echo "Restart Claude Code to load the new skill text."

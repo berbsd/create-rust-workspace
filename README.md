@@ -17,17 +17,17 @@ Also requires [`cargo-generate`](https://github.com/cargo-generate/cargo-generat
 
 ## Update
 
-Run `/plugin marketplace update` **before** `/plugin update` — in testing, `/plugin
-update` alone kept reinstalling the previously-cached version even after a new release
-was live on GitHub; only refreshing the marketplace first picked up the new version:
+From a regular shell (most reliable — in testing, the in-session `/plugin update` downloaded
+new versions into the cache without switching the active install, while the CLI did):
 
-```
-/plugin marketplace update create-rust-workspace
-/plugin update create-rust-workspace@create-rust-workspace
+```sh
+claude plugin marketplace update create-rust-workspace
+claude plugin update create-rust-workspace@create-rust-workspace
 ```
 
-If it's still showing the old version afterward, restart Claude Code — plugin metadata
-may be cached for a session's lifetime.
+Then **restart Claude Code** — skill text is loaded at session start, so a running session
+keeps using the old version. Confirm with `claude plugin list` (or check the `version` for
+`create-rust-workspace@create-rust-workspace` in `~/.claude/plugins/installed_plugins.json`).
 
 `/plugin list` shows what's currently installed (including version); `/plugin uninstall
 create-rust-workspace@create-rust-workspace` removes it.
@@ -67,6 +67,10 @@ specific template version or testing against a local checkout.
 anything; `bin/release VERSION --execute` cuts it for real — commits, tags, pushes, and
 opens a GitHub Release with the new `CHANGELOG.md` section as its notes. Changelog entries
 come from conventional commit messages via `git-cliff` (`.cliff.toml`).
+
+After a release, `bin/update-plugin` refreshes the marketplace, updates (or installs) the
+plugin locally, and fails loudly unless the active installed version matches the latest
+release tag. Restart Claude Code afterward to load the new skill text.
 
 ## License
 

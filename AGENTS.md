@@ -40,4 +40,7 @@ vendor or duplicate that template's content.
 - `bin/release VERSION` previews a release; `bin/release VERSION --execute` cuts it: bumps
   `.claude-plugin/plugin.json`, regenerates the changelog, tags, pushes, opens a GitHub
   Release. Don't hand-edit `CHANGELOG.md` or the manifest version directly.
+- `bin/update-plugin` makes the local Claude Code install match the latest release (and
+  verifies it did). Use it instead of in-session `/plugin update`, which has been seen to
+  download a new version without activating it.
 - Only commit when asked — this repo has no pre-commit hooks enforcing any of the above.
