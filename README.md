@@ -17,13 +17,17 @@ Also requires [`cargo-generate`](https://github.com/cargo-generate/cargo-generat
 
 ## Update
 
-Claude Code checks marketplaces for updates periodically in the background, but to
-update right away:
+Run `/plugin marketplace update` **before** `/plugin update` — in testing, `/plugin
+update` alone kept reinstalling the previously-cached version even after a new release
+was live on GitHub; only refreshing the marketplace first picked up the new version:
 
 ```
 /plugin marketplace update create-rust-workspace
 /plugin update create-rust-workspace@create-rust-workspace
 ```
+
+If it's still showing the old version afterward, restart Claude Code — plugin metadata
+may be cached for a session's lifetime.
 
 `/plugin list` shows what's currently installed (including version); `/plugin uninstall
 create-rust-workspace@create-rust-workspace` removes it.
