@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-09-22
+
+### Bug Fixes
+
+- Actually ask for Rust version, keep-example, and git-init
+
+### Documentation
+
+- Marketplace update must run before plugin update
+
 ## [0.2.0] - 2026-09-22
 
 ### Bug Fixes
