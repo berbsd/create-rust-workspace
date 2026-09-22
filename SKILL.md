@@ -29,65 +29,62 @@ command yourself; it's a new global tool, not something to add silently.
 
 ## Steps
 
-1. **Collect inputs.** Use `AskUserQuestion` (or plain follow-up questions if the user
-   already gave some of this) to gather:
-   - **Project name** (display name, e.g. "Acme Platform") — required.
-   - **Slug** (lowercase kebab-case identifier used for resource naming, e.g. "acme") —
-     offer a default derived from the project name, confirm it. `cargo-generate` names the
-     generated directory after the slug with no way to decouple the two (see `scaffold.sh`'s
-     header comment) — the workspace **will** be created at `<parent>/<slug>`.
-   - **Target parent directory** (where `<slug>` gets created; absolute or relative path,
-     created if it doesn't exist) — required. Default to the current directory if the user
-     doesn't have a preference. `<parent>/<slug>` must not already exist. If the user wants
-     a differently-named directory than the slug, generate normally and rename it afterward
-     — don't try to work around the constraint by passing a mismatched `--target`;
-     `scaffold.sh` rejects that outright.
-   - **Rust toolchain version** — this is the `rust-toolchain.toml` channel (and, via
-     `scaffold.sh`, also the Dockerfile's `FROM rust:` tag and both CI toolchain steps —
-     all four stay in lockstep), not the Cargo edition (the template is pinned to edition
-     2024 throughout; that isn't reconfigured by this skill). Ask the user; if they have
-     no preference, **default to the current latest stable Rust release**, resolved to a
-     concrete version number before offering it — never pass the bare word `stable` to
-     `scaffold.sh` (a floating channel defeats the reproducibility `rust-toolchain.toml`
-     exists for; see its own header comment). Resolve the latest stable version by, in
-     order of preference:
-     1. `rustc +stable --version` or `rustup check`, if `rustup`/`cargo` are available in
-        this environment.
-     2. A quick web check (e.g. the Rust blog's release announcements or
-        `static.rust-lang.org/dist/channel-rust-stable.toml`) if you have that tool
-        available and network access.
-     3. Otherwise, tell the user you can't confirm the current latest release and ask them
-        to supply one explicitly rather than guessing — a stale guess baked into every
-        generated project's Dockerfile/CI is worse than asking.
+1. **Collect inputs — interactively, not as a checklist dump.** Never print the full
+   list of fields below and ask the user to answer all of them in one reply; that's not
+   interactive, it's a form. Instead:
 
-     State the resolved version back to the user (e.g. "defaulting to 1.XX.0, today's
-     latest stable — let me know if you want a different one") rather than silently
-     assuming it.
-   - **Author name and email** — required (goes into `Cargo.toml` package authors and
-     README/CLAUDE.md contact references).
-   - **License** — required. A single SPDX id ("MIT", "AGPL-3.0", ...) or an
-     "A OR B" dual expression ("MIT OR Apache-2.0"). The template fetches
-     the real license text per id from GitHub's Licenses API at generation
-     time (needs `gh` installed and authenticated — if it's missing or the
-     id isn't one GitHub recognizes, generation still succeeds but no
-     `LICENSE` file is written for that id; mention this to the user rather
-     than silently treating it as done). "UNLICENSED" (npm's proprietary
-     marker, not a real SPDX id) always falls into that no-file case.
-   - **Repository URL** — required (a placeholder like `https://github.com/you/repo` is
-     fine if they don't have one yet).
-   - **Metrics namespace** (short prefix for metric names, e.g. "acme") — optional,
-     defaults to the slug; only ask if it's likely to differ from the slug.
-   - **Keep the bundled example service?** (yes/no) — the example (`services/example` +
-     `hosts/example-host`) demonstrates the service/host pattern end-to-end with a working
-     CRUD resource and passing tests. Recommend keeping it unless the user explicitly
-     wants an empty `services/`/`hosts/` tree to start from.
-   - **Initialize git and make the first commit?** (yes/no) — default yes. Maps directly to
-     `cargo generate`'s own `--vcs git`/`--vcs none`; the initial commit (when yes) is
-     cargo-generate's own, not a custom message — there's no way to control its text.
-   - **Template version** — only ask if the user explicitly wants something other than the
-     latest tagged release (e.g. pinning to an older version, or tracking `main` for
-     unreleased template changes). Otherwise don't ask; `scaffold.sh` resolves the latest
-     tag automatically and reports which one it used.
+   - **Ask directly, in one short message** (plain text — these are free-form, not a
+     small option set): project name, author name and email, and repository URL (a
+     placeholder like `https://github.com/you/repo` is fine if none exists yet). If the
+     user's own request already gave one of these, don't re-ask it.
+   - **Ask with `AskUserQuestion`** (real options, not prose) for:
+     - **License** — options like `MIT`, `Apache-2.0`, `MIT OR Apache-2.0` (dual), and
+       `UNLICENSED`, since `AskUserQuestion` always offers a custom "Other" slot for any
+       other SPDX id or dual expression. The template fetches the real license text per
+       id from GitHub's Licenses API at generation time (needs `gh` installed and
+       authenticated — if it's missing or the id isn't one GitHub recognizes, generation
+       still succeeds but no `LICENSE` file is written for that id; mention this to the
+       user rather than silently treating it as done). "UNLICENSED" (npm's proprietary
+       marker, not a real SPDX id) always falls into that no-file case.
+     - **Keep the bundled example service?** — only ask if it's not obvious from the
+       user's request (e.g. "start from a blank workspace" already answers it). Default
+       to yes without asking otherwise; the example (`services/example` +
+       `hosts/example-host`) demonstrates the service/host pattern end-to-end with a
+       working CRUD resource and passing tests.
+   - **Resolve the rest yourself and state what you chose — don't ask up front:**
+     - **Slug**: derive from the project name (kebab-case). State it in your final
+       report; only ask if the derived slug looks wrong or ambiguous. `cargo-generate`
+       names the generated directory after the slug with no way to decouple the two (see
+       `scaffold.sh`'s header comment) — the workspace **will** be created at
+       `<parent>/<slug>`. If the user wants a differently-named directory, generate
+       normally and rename it afterward — don't pass a mismatched `--target`;
+       `scaffold.sh` rejects that outright.
+     - **Target parent directory**: default to the current directory unless the user's
+       request implies otherwise. `<parent>/<slug>` must not already exist.
+     - **Rust toolchain version**: this is the `rust-toolchain.toml` channel (and, via
+       `scaffold.sh`, also the Dockerfile's `FROM rust:` tag and both CI toolchain steps
+       — all four stay in lockstep), not the Cargo edition (pinned to 2024 throughout;
+       not reconfigured by this skill). **Default to the current latest stable Rust
+       release**, resolved to a concrete version number — never pass the bare word
+       `stable` to `scaffold.sh` (a floating channel defeats the reproducibility
+       `rust-toolchain.toml` exists for). Resolve it, in order of preference:
+       1. `rustc +stable --version` or `rustup check`, if `rustup`/`cargo` are available.
+       2. A quick web check (e.g. the Rust blog's release announcements or
+          `static.rust-lang.org/dist/channel-rust-stable.toml`) if available.
+       3. Otherwise, tell the user you can't confirm the latest release and ask for one
+          explicitly rather than guessing — a stale guess baked into every generated
+          project's Dockerfile/CI is worse than asking.
+
+       State the resolved version in your final report (e.g. "used 1.XX.0, today's
+       latest stable") rather than silently assuming it with no mention at all.
+     - **Metrics namespace**: defaults to the slug; only ask if it's likely to differ.
+     - **Initialize git and make the first commit?**: default yes. Maps directly to
+       `cargo generate`'s own `--vcs git`/`--vcs none`; the initial commit (when yes) is
+       cargo-generate's own, not a custom message — there's no way to control its text.
+     - **Template version**: only ask if the user explicitly wants something other than
+       the latest tagged release (e.g. pinning to an older version, or tracking `main`
+       for unreleased template changes). Otherwise `scaffold.sh` resolves the latest tag
+       automatically and reports which one it used.
 
 2. **Run the scaffold script**, using the plugin-provided path so it works regardless of
    where Claude Code installed this plugin:
@@ -126,9 +123,12 @@ command yourself; it's a new global tool, not something to add silently.
 
 3. **Report the result**: the target path, which template version was used (the script's
    final output line states this), whether the example was kept, and the printed next steps
-   (`./bin/bootstrap` then `just check`). Don't run those yourself unless the user asks —
-   `bootstrap` installs system-level tooling (Homebrew casks, rustup components) and is a
-   meaningfully impactful action to take unprompted.
+   (`./bin/bootstrap` then `just check`). Also state whatever you resolved automatically in
+   step 1 instead of asking — slug, Rust version, git-init — so the user sees what was
+   chosen on their behalf even though they were never asked. Don't run `bootstrap`/`just
+   check` yourself unless the user asks — `bootstrap` installs system-level tooling
+   (Homebrew casks, rustup components) and is a meaningfully impactful action to take
+   unprompted.
 
 ## Notes
 
