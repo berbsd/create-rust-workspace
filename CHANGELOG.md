@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2026-09-22
+
+### Features
+
+- Add bin/update-plugin to sync the local install to the latest release
+
 ## [0.2.2] - 2026-09-22
 
 ### Bug Fixes
