@@ -65,7 +65,14 @@ command yourself; it's a new global tool, not something to add silently.
      assuming it.
    - **Author name and email** — required (goes into `Cargo.toml` package authors and
      README/CLAUDE.md contact references).
-   - **License** (e.g. "MIT", "Apache-2.0", "UNLICENSED") — required.
+   - **License** — required. A single SPDX id ("MIT", "AGPL-3.0", ...) or an
+     "A OR B" dual expression ("MIT OR Apache-2.0"). The template fetches
+     the real license text per id from GitHub's Licenses API at generation
+     time (needs `gh` installed and authenticated — if it's missing or the
+     id isn't one GitHub recognizes, generation still succeeds but no
+     `LICENSE` file is written for that id; mention this to the user rather
+     than silently treating it as done). "UNLICENSED" (npm's proprietary
+     marker, not a real SPDX id) always falls into that no-file case.
    - **Repository URL** — required (a placeholder like `https://github.com/you/repo` is
      fine if they don't have one yet).
    - **Metrics namespace** (short prefix for metric names, e.g. "acme") — optional,
